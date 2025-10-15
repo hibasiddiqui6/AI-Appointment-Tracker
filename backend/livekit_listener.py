@@ -114,7 +114,8 @@ class CallListener:
                         await self.process_audio_buffer()
                         # set call duration at first finalization as well
                         if self.call_start_time:
-                            self.appointment_data.call_duration = now - self.call_start_time
+                            duration_seconds = now - self.call_start_time
+                            self.appointment_data.call_duration = self.format_duration(duration_seconds)
                         self.processed_once = True
                         is_speaking = False
                         self.last_processed_time = now
@@ -263,8 +264,6 @@ class CallListener:
                 logger.info("End phrase detected; marking call as finalized")
             
             extracted_data = await self.data_extractor.extract_from_transcript(self.transcript)
-            self.appointment_data = extracted_data
-            self.appointment_data.transcript = self.transcript
             
             logger.info(f"Extracted data: {self.appointment_data.to_json()}")
             

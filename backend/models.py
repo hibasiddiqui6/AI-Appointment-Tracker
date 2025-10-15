@@ -9,7 +9,7 @@ class AppointmentData(BaseModel):
     appointment_date: Optional[str] = None
     appointment_time: Optional[str] = None
     appointment_reason: Optional[str] = None
-    call_duration: Optional[float] = None
+    call_duration: Optional[str] = None
     transcript: Optional[str] = None
     
     def to_json(self) -> dict:
