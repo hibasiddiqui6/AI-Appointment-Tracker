@@ -25,6 +25,8 @@ class CallListener:
         self.call_start_time = None
         self.appointment_data = AppointmentData()
         self.audio_buffer = []
+        # Reference to rtc.Room when running via run_rtc_listener
+        self.room = None
         
         # Speech detection parameters (tuned)
         self.silence_threshold = 3.0  # seconds of silence before processing
@@ -135,6 +137,8 @@ class CallListener:
                         if self.call_start_time:
                             duration_seconds = now - self.call_start_time
                             self.appointment_data.call_duration = self.format_duration(duration_seconds)
+                        # Notify UI that call should end
+                        await self.notify_ui_call_finished()
                         self.processed_once = True
                         is_speaking = False
                         self.last_processed_time = now
@@ -346,6 +350,25 @@ class CallListener:
         # Prepare for a new session if the room reconnects later
         self.reset_state()
 
+    async def notify_ui_call_finished(self):
+        """Send a small data message over LiveKit so the UI can auto-leave.
+        Works only when running with rtc.Room in run_rtc_listener.
+        """
+        try:
+            if self.room and getattr(self.room, "local_participant", None):
+                message = b"END_CALL"
+                try:
+                    # Prefer reliable delivery if supported
+                    await self.room.local_participant.publish_data(
+                        message, kind=rtc.DataPacketKind.RELIABLE
+                    )
+                except TypeError:
+                    # Older versions may not accept kind kwarg
+                    await self.room.local_participant.publish_data(message)
+                logger.info("Sent END_CALL signal to UI")
+        except Exception as e:
+            logger.warning(f"Failed to send END_CALL signal: {e}")
+
 async def entrypoint(ctx: JobContext):
     """Main entrypoint for the LiveKit agent"""
     logger.info("Starting LiveKit call listener")
@@ -383,6 +406,7 @@ async def run_rtc_listener(room_name: str = "demo", identity: str = "listener-ag
     # Create room and listener instance
     room = rtc.Room()
     listener = CallListener()
+    listener.room = room
 
     # Set call start time at connection; will be overwritten on first speech
     listener.call_start_time = time.time()
