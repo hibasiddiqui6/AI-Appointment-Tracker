@@ -351,19 +351,15 @@ class CallListener:
         self.reset_state()
 
     async def notify_ui_call_finished(self):
-        """Send a small data message over LiveKit so the UI can auto-leave.
-        Works only when running with rtc.Room in run_rtc_listener.
-        """
+        """Send a small data message so the UI auto-leaves."""
         try:
-            if self.room and getattr(self.room, "local_participant", None):
+            if getattr(self, "room", None) and getattr(self.room, "local_participant", None):
                 message = b"END_CALL"
                 try:
-                    await self.room.local_participant.publish_data(
-                        b"END_CALL", topic="control"
-                    )
-
+                    # default is reliable; no enum needed
+                    await self.room.local_participant.publish_data(message, topic="control")
                 except TypeError:
-                    # Older versions may not accept kind kwarg
+                    # older SDKs without topic kwarg
                     await self.room.local_participant.publish_data(message)
                 logger.info("Sent END_CALL signal to UI")
         except Exception as e:
