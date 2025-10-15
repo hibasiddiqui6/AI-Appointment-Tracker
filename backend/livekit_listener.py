@@ -358,10 +358,10 @@ class CallListener:
             if self.room and getattr(self.room, "local_participant", None):
                 message = b"END_CALL"
                 try:
-                    # Prefer reliable delivery if supported
                     await self.room.local_participant.publish_data(
-                        message, kind=rtc.DataPacketKind.RELIABLE
+                        b"END_CALL", topic="control"
                     )
+
                 except TypeError:
                     # Older versions may not accept kind kwarg
                     await self.room.local_participant.publish_data(message)
