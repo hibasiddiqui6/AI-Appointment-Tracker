@@ -30,11 +30,7 @@ class CallListener:
         
         # Speech detection parameters (tuned)
         self.silence_threshold = 3.0  # seconds of silence before processing
-        self.min_speech_duration = 1.0
-        self.last_audio_time = 0
         self.last_processed_time = 0
-        self.speech_detected = False
-        self.processing_timer = None
         self.processed_once = False  # avoid double-processing on disconnect
         self.webhook_sent = False
 
@@ -52,10 +48,7 @@ class CallListener:
         self.call_start_time = None
         self.appointment_data = AppointmentData()
         self.audio_buffer = []
-        self.last_audio_time = 0
         self.last_processed_time = 0
-        self.speech_detected = False
-        self.processing_timer = None
         self.processed_once = False
         
     async def on_participant_connected(self, participant: rtc.RemoteParticipant):
@@ -191,39 +184,6 @@ class CallListener:
             hours = minutes // 60
             minutes = minutes % 60
             return f"{hours}:{minutes:02d}:{seconds:02d}"
-    
-    async def start_speech_detection(self):
-        """Start continuous speech detection monitoring"""
-        logger.info("Starting speech detection monitoring")
-        
-        # Allow some time to accumulate audio, then process if any
-        await asyncio.sleep(self.silence_threshold)
-        if self.speech_detected:
-            logger.info("Speech detected - processing audio buffer (initial)")
-            await self.process_audio_buffer()
-        else:
-            logger.warning("No speech detected within timeout; skipping transcription")
-    
-    async def schedule_processing(self):
-        """Schedule processing after silence period"""
-        try:
-            await asyncio.sleep(self.silence_threshold)
-            
-            # Check if we still have speech detected
-            logger.info(f"Silence check: idle={(time.time() - self.last_audio_time):.2f}s, processed_once={self.processed_once}")
-            if (
-                not self.processed_once and
-                self.speech_detected and 
-                len(self.audio_buffer) > 0 and 
-                (time.time() - self.last_audio_time) >= self.silence_threshold
-            ):
-                
-                logger.info("Silence detected - processing audio buffer (finalize segment)")
-                await self.process_audio_buffer()
-                self.processed_once = True
-                
-        except asyncio.CancelledError:
-            logger.debug("Processing timer cancelled - new audio detected")
         
     async def process_audio_buffer(self):
         """Process buffered audio data for transcription"""

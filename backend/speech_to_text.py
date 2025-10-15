@@ -1,8 +1,5 @@
 import asyncio
 import logging
-import tempfile
-import os
-from typing import AsyncGenerator
 from config import Config
 import whisper
 from deepgram import DeepgramClient, PrerecordedOptions, FileSource
@@ -22,15 +19,6 @@ class SpeechToText:
         else:
             return "whisper_local"
     
-    async def transcribe_audio_stream(self, audio_stream: AsyncGenerator[bytes, None]) -> str:
-        """Transcribe audio stream to text"""
-        logger.info(f"Using STT provider: {self.stt_provider}")
-        
-        if self.stt_provider == "deepgram":
-            return await self._transcribe_with_deepgram(audio_stream)
-        else:
-            return await self._transcribe_with_whisper(audio_stream)
-    
     async def transcribe_audio_file(self, audio_file_path: str) -> str:
         """Transcribe audio file to text"""
         logger.info(f"Transcribing audio file with {self.stt_provider}")
@@ -39,45 +27,6 @@ class SpeechToText:
             return await self._transcribe_file_with_deepgram(audio_file_path)
         else:
             return await self._transcribe_file_with_whisper(audio_file_path)
-    
-    async def _transcribe_with_deepgram(self, audio_stream: AsyncGenerator[bytes, None]) -> str:
-        """Transcribe using Deepgram streaming API"""
-        try:
-            
-            deepgram = DeepgramClient(self.config.DEEPGRAM_API_KEY)
-            
-            # Collect audio data from stream
-            audio_data = b""
-            async for chunk in audio_stream:
-                audio_data += chunk
-            
-            # Create file source
-            payload: FileSource = {
-                "buffer": audio_data,
-            }
-            
-            options = PrerecordedOptions(
-                model="nova-2",
-                smart_format=True,
-                punctuate=True,
-                diarize=True,  # Speaker identification
-                language="en"
-            )
-            
-            response = await deepgram.listen.prerecorded.v("1").transcribe_file(
-                payload, options
-            )
-            
-            # Extract transcript
-            transcript = response.results.channels[0].alternatives[0].transcript
-            logger.info(f"Deepgram transcript: {transcript}")
-            
-            return transcript
-            
-        except Exception as e:
-            logger.error(f"Error with Deepgram transcription: {e}")
-            # Fallback to Whisper
-            return await self._transcribe_with_whisper(audio_stream)
     
     async def _transcribe_file_with_deepgram(self, audio_file_path: str) -> str:
         """Transcribe audio file using Deepgram"""
@@ -112,30 +61,6 @@ class SpeechToText:
         except Exception as e:
             logger.error(f"Error with Deepgram file transcription: {e}")
             return await self._transcribe_file_with_whisper(audio_file_path)
-    
-    async def _transcribe_with_whisper(self, audio_stream: AsyncGenerator[bytes, None]) -> str:
-        """Transcribe using local Whisper"""
-        try:
-            # Save audio stream to temporary file
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-                temp_path = temp_file.name
-                
-                # Collect audio data from stream
-                async for chunk in audio_stream:
-                    temp_file.write(chunk)
-                temp_file.flush()
-                
-                # Transcribe the file
-                transcript = await self._transcribe_file_with_whisper(temp_path)
-                
-                # Clean up
-                os.unlink(temp_path)
-                
-                return transcript
-                
-        except Exception as e:
-            logger.error(f"Error with Whisper stream transcription: {e}")
-            return ""
     
     async def _transcribe_file_with_whisper(self, audio_file_path: str) -> str:
         """Transcribe audio file using local Whisper"""
