@@ -54,6 +54,16 @@
 
       room.on('connected', () => { log('Room connected'); leaveBtn.disabled = false; });
       room.on('disconnected', () => { log('Room disconnected'); leaveBtn.disabled = true; startBtn.disabled = false; });
+      // Listen for backend END_CALL signal (sent when silence threshold finalizes audio)
+      room.on('dataReceived', async (payload, participant, kind) => {
+        try{
+          const text = typeof payload === 'string' ? payload : new TextDecoder().decode(payload);
+          if(text === 'END_CALL'){
+            log('Received END_CALL from backend; leaving room');
+            await leave();
+          }
+        }catch(e){ /* ignore */ }
+      });
       room.on('participantConnected', (p) => log('Participant connected: ' + p.identity));
       room.on('participantDisconnected', (p) => log('Participant disconnected: ' + p.identity));
       room.on('trackSubscribed', (_track, pub, p) => log('Track subscribed: ' + pub.kind + ' from ' + (p?.identity||'unknown')));

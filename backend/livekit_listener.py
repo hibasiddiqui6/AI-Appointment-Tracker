@@ -25,6 +25,8 @@ class CallListener:
         self.call_start_time = None
         self.appointment_data = AppointmentData()
         self.audio_buffer = []
+        # Reference to rtc.Room when running via run_rtc_listener
+        self.room = None
         
         # Speech detection parameters (tuned)
         self.silence_threshold = 3.0  # seconds of silence before processing
@@ -38,14 +40,33 @@ class CallListener:
             "bye", "goodbye", "see you", "talk to you later", "thanks, bye",
             "have a nice day", "thank you bye", "that will be all"
         ]
+    
+    def reset_state(self):
+        """Reset listener state for a brand-new participant/call.
+        This avoids carrying transcript and timers between calls.
+        """
+        logger.info("Resetting call state for new participant")
+        self.transcript = ""
+        self.call_start_time = None
+        self.appointment_data = AppointmentData()
+        self.audio_buffer = []
+        self.last_audio_time = 0
+        self.last_processed_time = 0
+        self.speech_detected = False
+        self.processing_timer = None
+        self.processed_once = False
         
     async def on_participant_connected(self, participant: rtc.RemoteParticipant):
         """Called when a participant joins the room"""
         logger.info(f"Participant {participant.identity} connected")
+        # New participant implies a new call session; clear prior state
+        self.reset_state()
         
     async def on_participant_disconnected(self, participant: rtc.RemoteParticipant):
         """Called when a participant leaves the room"""
         logger.info(f"Participant {participant.identity} disconnected")
+        # Reset immediately so any reconnection starts clean
+        self.reset_state()
         
     async def on_track_subscribed(self, track: rtc.Track, publication: rtc.TrackPublication, participant: rtc.RemoteParticipant):
         """Called when a track is subscribed"""
@@ -116,6 +137,8 @@ class CallListener:
                         if self.call_start_time:
                             duration_seconds = now - self.call_start_time
                             self.appointment_data.call_duration = self.format_duration(duration_seconds)
+                        # Notify UI that call should end
+                        await self.notify_ui_call_finished()
                         self.processed_once = True
                         is_speaking = False
                         self.last_processed_time = now
@@ -293,7 +316,8 @@ class CallListener:
             # Ensure transcript and duration are up-to-date before sending
             if self.transcript:
                 self.appointment_data.transcript = self.transcript
-            if self.call_start_time:
+            # Do not overwrite duration if it was already finalized
+            if self.call_start_time and not self.appointment_data.call_duration:
                 duration_seconds = time.time() - self.call_start_time
                 self.appointment_data.call_duration = self.format_duration(duration_seconds)
             success = await self.webhook_sender.send_appointment_data(self.appointment_data)
@@ -322,6 +346,28 @@ class CallListener:
             
         # Send data to webhook
         await self.send_to_webhook()
+        
+        # Prepare for a new session if the room reconnects later
+        self.reset_state()
+
+    async def notify_ui_call_finished(self):
+        """Send a small data message over LiveKit so the UI can auto-leave.
+        Works only when running with rtc.Room in run_rtc_listener.
+        """
+        try:
+            if self.room and getattr(self.room, "local_participant", None):
+                message = b"END_CALL"
+                try:
+                    # Prefer reliable delivery if supported
+                    await self.room.local_participant.publish_data(
+                        message, kind=rtc.DataPacketKind.RELIABLE
+                    )
+                except TypeError:
+                    # Older versions may not accept kind kwarg
+                    await self.room.local_participant.publish_data(message)
+                logger.info("Sent END_CALL signal to UI")
+        except Exception as e:
+            logger.warning(f"Failed to send END_CALL signal: {e}")
 
 async def entrypoint(ctx: JobContext):
     """Main entrypoint for the LiveKit agent"""
@@ -360,6 +406,7 @@ async def run_rtc_listener(room_name: str = "demo", identity: str = "listener-ag
     # Create room and listener instance
     room = rtc.Room()
     listener = CallListener()
+    listener.room = room
 
     # Set call start time at connection; will be overwritten on first speech
     listener.call_start_time = time.time()
