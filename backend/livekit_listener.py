@@ -36,6 +36,8 @@ class CallListener:
         self.speech_detected = False
         self.processing_timer = None
         self.processed_once = False  # avoid double-processing on disconnect
+        self.webhook_sent = False
+
         self.end_phrases = [
             "bye", "goodbye", "see you", "talk to you later", "thanks, bye",
             "have a nice day", "thank you bye", "that will be all"
@@ -312,6 +314,8 @@ class CallListener:
     async def send_to_webhook(self):
         """Send appointment data to n8n webhook"""
         try:
+            if self.webhook_sent:
+                return
             logger.info("Sending data to webhook...")
             # Ensure transcript and duration are up-to-date before sending
             if self.transcript:
@@ -323,6 +327,7 @@ class CallListener:
             success = await self.webhook_sender.send_appointment_data(self.appointment_data)
             if success:
                 logger.info("✅ Data sent to webhook successfully")
+                self.webhook_sent = True
             else:
                 logger.error("❌ Failed to send data to webhook")
         except Exception as e:
