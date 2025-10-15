@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LiveKit Call Starter</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div class="container">
+    <h2>Start a LiveKit Call</h2>
+    <div class="row">
+      <label>Name</label>
+      <input id="name" placeholder="Your name" />
+    </div>
+    <div class="row">
+      <label>Room</label>
+      <input id="room" value="demo" />
+    </div>
+    <div class="row">
+      <button id="startBtn">Start Call</button>
+      <button id="leaveBtn" disabled>Leave</button>
+    </div>
+
+    <pre id="log" class="log"></pre>
+  </div>
+
+  <!-- Load LiveKit UMD bundle first (jsDelivr) -->
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Then our app code -->
+  <script src="./main.js"></script>
+</body>
+</html>
