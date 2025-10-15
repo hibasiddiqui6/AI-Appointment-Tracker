@@ -264,8 +264,24 @@ class CallListener:
                 logger.info("End phrase detected; marking call as finalized")
             
             extracted_data = await self.data_extractor.extract_from_transcript(self.transcript)
-            
-            logger.info(f"Extracted data: {self.appointment_data.to_json()}")
+
+            # Merge extracted fields into our existing appointment_data
+            # without overwriting already set values like call_duration.
+            if extracted_data:
+                if getattr(extracted_data, "name", None):
+                    self.appointment_data.name = extracted_data.name
+                if getattr(extracted_data, "email", None):
+                    self.appointment_data.email = extracted_data.email
+                if getattr(extracted_data, "phone", None):
+                    self.appointment_data.phone = extracted_data.phone
+                if getattr(extracted_data, "appointment_date", None):
+                    self.appointment_data.appointment_date = extracted_data.appointment_date
+                if getattr(extracted_data, "appointment_time", None):
+                    self.appointment_data.appointment_time = extracted_data.appointment_time
+                if getattr(extracted_data, "appointment_reason", None):
+                    self.appointment_data.appointment_reason = extracted_data.appointment_reason
+
+            logger.info(f"Extracted data merged: {self.appointment_data.to_json()}")
             
         except Exception as e:
             logger.error(f"Error extracting data: {e}")
@@ -274,6 +290,12 @@ class CallListener:
         """Send appointment data to n8n webhook"""
         try:
             logger.info("Sending data to webhook...")
+            # Ensure transcript and duration are up-to-date before sending
+            if self.transcript:
+                self.appointment_data.transcript = self.transcript
+            if self.call_start_time:
+                duration_seconds = time.time() - self.call_start_time
+                self.appointment_data.call_duration = self.format_duration(duration_seconds)
             success = await self.webhook_sender.send_appointment_data(self.appointment_data)
             if success:
                 logger.info("✅ Data sent to webhook successfully")
