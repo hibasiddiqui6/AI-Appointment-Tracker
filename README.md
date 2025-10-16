@@ -82,10 +82,6 @@ DEEPGRAM_API_KEY=your-deepgram-api-key
 # Leave empty for local Whisper
 # n8n Webhook
 N8N_WEBHOOK_URL=https://your-n8n-instance.com/webhook/appointment-data
-# Airtable (Optional - for bonus)
-AIRTABLE_API_KEY=your-airtable-api-key
-AIRTABLE_BASE_ID=your-base-id
-AIRTABLE_TABLE_ID=your-table-id
 ```
 
 ### 4. Start the Complete System
