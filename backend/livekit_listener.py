@@ -6,9 +6,10 @@ import numpy as np
 from livekit import rtc, api
 from config import Config
 from models import AppointmentData
-from data_extractor_multi import DataExtractor
-from webhook_sender import WebhookSender
+from data_extractor import DataExtractor
 from speech_to_text import SpeechToText
+from webhook_sender import WebhookSender
+from token_utils import build_livekit_token
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +30,7 @@ class CallListener:
         
         # Speech detection parameters (tuned)
         self.silence_threshold = 3.0  # seconds of silence before processing
+        self.min_speech_threshold = 0.01  # minimum audio level to consider as speech
         self.last_processed_time = 0
         self.processed_once = False  # avoid double-processing on disconnect
         self.webhook_sent = False
@@ -85,7 +87,7 @@ class CallListener:
                 if finalized:
                     break
                 frame = getattr(audio_event, "frame", audio_event)
-                # Calculate simple RMS audio level (0..1)
+
                 audio_level = self.calculate_audio_level(frame)
                 
                 # Get raw bytes
@@ -110,7 +112,7 @@ class CallListener:
                 now = time.time()
                 
                 # VAD transitions
-                if audio_level > 0.01 and not is_speaking:
+                if audio_level > self.min_speech_threshold and not is_speaking:
                     # Speech start
                     logger.info(f"Speech start (level={audio_level:.3f})")
                     is_speaking = True
@@ -119,10 +121,10 @@ class CallListener:
                     # ensure call start captured when user first speaks
                     if self.call_start_time is None:
                         self.call_start_time = now
-                elif audio_level > 0.01 and is_speaking:
+                elif audio_level > self.min_speech_threshold and is_speaking:
                     # Speech continues
                     last_activity_time = now
-                elif audio_level <= 0.01 and is_speaking:
+                elif audio_level <= self.min_speech_threshold and is_speaking:
                     # Possible speech end if silence exceeds threshold
                     if last_activity_time and (now - last_activity_time) > self.silence_threshold:
                         logger.info(f"Speech end after {now - last_activity_time:.2f}s silence; processing")
@@ -358,19 +360,16 @@ async def run_rtc_listener(room_name: str = "demo", identity: str = "listener-ag
     )
     room.on("disconnected", lambda: asyncio.create_task(listener.on_room_disconnected()))
 
-    # Build JWT token for the listener to join and subscribe only
-    grant = api.VideoGrants(
-        room_join=True,
-        room=room_name,
+    # Build JWT token for the listener to join and subscribe only (shared helper)
+    token, _ = build_livekit_token(
+        room_name=room_name,
+        identity=identity,
+        name="RTC Listener",
         can_publish=False,
         can_subscribe=True,
         can_publish_data=True,
+        ttl_hours=24,
     )
-    at = api.AccessToken(api_key=cfg.LIVEKIT_API_KEY, api_secret=cfg.LIVEKIT_API_SECRET)
-    at.with_identity(identity)
-    at.with_name("RTC Listener")
-    at.with_grants(grant)
-    token = at.to_jwt()
 
     logger.info(f"Connecting RTC listener to room '{room_name}'")
     await room.connect(cfg.LIVEKIT_URL, token)

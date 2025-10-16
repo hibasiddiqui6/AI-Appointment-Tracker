@@ -5,7 +5,7 @@ body{
     padding:0
 }
 .container{
-    max-width:720px;
+    max-width:600px;
     margin:48px auto;
     background:#fff;
     border:1px solid #e7e9ef;
@@ -17,7 +17,22 @@ body{
     display:flex;
     align-items:center;
     margin:10px 0;
-    gap:10px
+    gap:15px
+}
+
+/* center content within rows (buttons etc.) */
+.row { justify-content: center; }
+
+.status{
+    text-align:center;
+    margin-top:12px;
+    font-size:16px;
+    color:#111;
+}
+
+.container h2{
+    text-align:center;
+    margin-top:5;
 }
 label{
     min-width:80px; 
@@ -30,23 +45,20 @@ input{
     border-radius:6px
 }
 button{
-    padding:10px 16px;
+    padding:15px 24px;
     border:0;
-    border-radius:6px;
+    border-radius:8px;
     background:#0059ff;
     color:#fff;
     cursor:pointer
+}
+button {
+  font-size: 18px;      /* larger text */
+  padding: 12px 20px;   /* more clickable area to match larger text */
+  line-height: 1.2;
+  border-radius: 8px;   /* optional: slightly rounder corners */
 }
 button[disabled]{
     opacity:.5;
     cursor:not-allowed
 }
-.log{
-    background:#0b1020;
-    color:#c7d2ee;
-    border-radius:8px;
-    min-height:160px;
-    padding:12px;
-    white-space:pre-wrap
-}
-

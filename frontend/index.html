@@ -9,20 +9,13 @@
 <body>
   <div class="container">
     <h2>Start a LiveKit Call</h2>
-    <div class="row">
-      <label>Name</label>
-      <input id="name" placeholder="Your name" />
-    </div>
-    <div class="row">
-      <label>Room</label>
-      <input id="room" value="demo" />
-    </div>
+    <!-- Minimal UI: no name/room inputs; defaults used by the app -->
     <div class="row">
       <button id="startBtn">Start Call</button>
       <button id="leaveBtn" disabled>Leave</button>
     </div>
 
-    <pre id="log" class="log"></pre>
+  <div id="status" class="status">Not connected</div>
   </div>
 
   <!-- Load LiveKit UMD bundle first (jsDelivr) -->

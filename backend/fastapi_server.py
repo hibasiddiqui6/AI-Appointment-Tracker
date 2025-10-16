@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from livekit import api
 from config import Config
 from models import TokenRequest, TokenResponse
+from token_utils import build_livekit_token
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -16,10 +17,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
         "http://localhost",
         "http://127.0.0.1",
+        "http://localhost:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -50,34 +50,22 @@ async def generate_token(request: TokenRequest):
     try:
         participant_identity = request.participant_identity or f"user-{request.participant_name.lower().replace(' ', '-')}"
 
-        # Build token
-        token = api.AccessToken(api_key=config.LIVEKIT_API_KEY, api_secret=config.LIVEKIT_API_SECRET)
-        token.with_identity(participant_identity)
-        token.with_name(request.participant_name)
-        token.with_metadata(request.participant_name)
-
-        grant = api.VideoGrants(
-            room_join=True,
-            room=request.room_name,
+        jwt_token, expires_at = build_livekit_token(
+            room_name=request.room_name,
+            identity=participant_identity,
+            name=request.participant_name,
             can_publish=request.can_publish,
             can_subscribe=request.can_subscribe,
             can_publish_data=request.can_publish_data,
-            can_update_own_metadata=True,
-            hidden=False,
-            recorder=False,
+            ttl_hours=24,
         )
-        token.with_grants(grant)
-        token.with_ttl(timedelta(hours=24))
-
-        jwt_token = token.to_jwt()
-        expires_at = datetime.now() + timedelta(hours=24)
 
         return TokenResponse(
             token=jwt_token,
             room_name=request.room_name,
             participant_identity=participant_identity,
             livekit_url=config.LIVEKIT_URL,
-            expires_at=expires_at.isoformat(),
+            expires_at=expires_at,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate token: {e}")

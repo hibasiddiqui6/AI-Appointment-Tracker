@@ -1,12 +1,13 @@
 (function(){
-  const logEl = document.getElementById('log');
-  const nameEl = document.getElementById('name');
-  const roomEl = document.getElementById('room');
+  const statusEl = document.getElementById('status');
   const startBtn = document.getElementById('startBtn');
   const leaveBtn = document.getElementById('leaveBtn');
 
   /** helpers */
-  const log = (m)=>{ if(logEl){ logEl.textContent += m + "\n"; logEl.scrollTop = logEl.scrollHeight; } console.log(m); };
+  // console-only logger
+  const log = (m)=>{ console.log(m); };
+  // UI status (small single-line indicator)
+  const setStatus = (s)=>{ if(statusEl){ statusEl.textContent = s; } }
   // Backend API base (token service)
   const apiBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
     ? 'http://localhost:8000'
@@ -44,11 +45,12 @@
   async function startCall(){
     startBtn.disabled = true;
     try{
-      const participantName = nameEl.value || 'Guest';
-      const roomName = roomEl.value || 'demo';
+  const participantName = 'Guest';
+  const roomName = 'demo';
       log('Requesting token...');
       const t = await getToken(participantName, roomName);
-      log('Connecting to LiveKit room: ' + t.livekit_url);
+  log('Connecting to LiveKit room: ' + t.livekit_url);
+  setStatus('Connecting...');
 
       room = new LivekitClient.Room();
 
@@ -79,20 +81,24 @@
       room.on('trackSubscribed', (_track, pub, p) => log('Track subscribed: ' + pub.kind + ' from ' + (p?.identity||'unknown')));
 
       await room.connect(t.livekit_url, t.token);
-      log('Connected to room');
+  log('Connected to room');
+  setStatus('Connected — publishing microphone...');
 
       const mic = await createMicrophoneTrack();
-      await room.localParticipant.publishTrack(mic);
-      log('Published microphone');
+  await room.localParticipant.publishTrack(mic);
+  log('Published microphone');
+  // replace the long scrolling UI log with a concise status
+  setStatus('Call connected');
 
     }catch(e){
       log('Error: ' + (e?.message||e));
+      setStatus('Error: ' + (e?.message||e));
       startBtn.disabled = false;
     }
   }
 
   async function leave(){
-    try{ if(room){ await room.disconnect(); } }catch{} finally{ leaveBtn.disabled = true; startBtn.disabled = false; }
+    try{ if(room){ await room.disconnect(); } }catch{} finally{ leaveBtn.disabled = true; startBtn.disabled = false; setStatus('Not connected'); }
   }
 
   startBtn.addEventListener('click', startCall);

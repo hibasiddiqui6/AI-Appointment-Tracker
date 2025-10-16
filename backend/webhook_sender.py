@@ -1,6 +1,5 @@
 import aiohttp
 import logging
-from typing import Optional
 from models import AppointmentData
 from config import Config
 
