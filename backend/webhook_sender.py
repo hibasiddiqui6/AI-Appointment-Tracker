@@ -29,7 +29,6 @@ class WebhookSender:
                     headers={'Content-Type': 'application/json'}
                 ) as response:
                     if response.status == 200:
-                        logger.info("Successfully sent data to n8n webhook")
                         return True
                     else:
                         logger.error(f"Webhook returned status {response.status}")
