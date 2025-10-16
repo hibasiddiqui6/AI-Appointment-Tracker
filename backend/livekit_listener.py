@@ -4,7 +4,6 @@ import time
 import tempfile, wave, os, io
 import numpy as np
 from livekit import rtc, api
-from livekit.agents import AutoSubscribe, JobContext, WorkerOptions, cli
 from config import Config
 from models import AppointmentData
 from data_extractor_multi import DataExtractor
@@ -323,27 +322,7 @@ class CallListener:
         # Send data to webhook
         await self.send_to_webhook()
 
-async def entrypoint(ctx: JobContext):
-    """Main entrypoint for the LiveKit agent"""
-    logger.info("Starting LiveKit call listener")
     
-    listener = CallListener()
-    listener.call_start_time = asyncio.get_event_loop().time()
-    
-    # Set up event handlers
-    ctx.room.on("participant_connected", listener.on_participant_connected)
-    ctx.room.on("participant_disconnected", listener.on_participant_disconnected)
-    ctx.room.on("track_subscribed", listener.on_track_subscribed)
-    ctx.room.on("disconnected", listener.on_room_disconnected)
-    
-    # Wait for the room to be active
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-    
-    # Keep the agent running
-    await asyncio.sleep(1)
-
-if __name__ == "__main__":
-    cli.run_app(WorkerOptions(entrypoint_fnc=entrypoint))
 
 # --- Direct RTC listener (joins a room with JWT) ---
 async def run_rtc_listener(room_name: str = "demo", identity: str = "listener-agent"):
