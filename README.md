@@ -88,14 +88,7 @@ AIRTABLE_BASE_ID=your-base-id
 AIRTABLE_TABLE_ID=your-table-id
 ```
 
-### 4. Test the System
-
-```bash
-# Make sure virtual environment is activated
-cd backend
-```
-
-### 5. Start the Complete System
+### 4. Start the Complete System
 
 **Start Backend Services:**
 
