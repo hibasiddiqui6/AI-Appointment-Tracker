@@ -18,8 +18,3 @@ class Config:
     
     # n8n Webhook
     N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL")
-    
-    # Airtable (Optional)
-    AIRTABLE_API_KEY = os.getenv("AIRTABLE_API_KEY")
-    AIRTABLE_BASE_ID = os.getenv("AIRTABLE_BASE_ID")
-    AIRTABLE_TABLE_ID = os.getenv("AIRTABLE_TABLE_ID")

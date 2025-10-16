@@ -328,9 +328,7 @@ class CallListener:
                 logger.info("Sent END_CALL signal to UI")
         except Exception as e:
             logger.warning(f"Failed to send END_CALL signal: {e}")
-
-    
-
+            
 # --- Direct RTC listener (joins a room with JWT) ---
 async def run_rtc_listener(room_name: str = "demo", identity: str = "listener-agent"):
     """Join a LiveKit room directly using rtc.Room and listen for audio tracks.

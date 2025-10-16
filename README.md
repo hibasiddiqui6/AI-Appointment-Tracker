@@ -76,7 +76,6 @@ AIRTABLE_TABLE_ID=your-table-id
 ```bash
 # Make sure virtual environment is activated
 cd backend
-python -c "from config import Config; print('✅ Configuration loaded successfully')"
 ```
 ### 5. Start the Complete System
 **Start Backend Services:**

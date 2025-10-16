@@ -109,7 +109,6 @@ class DataExtractor:
             logger.error(f"Error with Gemini extraction: {e}")
             return self._extract_with_regex(transcript)
     
-    
     def _extract_with_regex(self, transcript: str) -> AppointmentData:
         """Fallback regex-based extraction (works without any API)"""
         data = AppointmentData()

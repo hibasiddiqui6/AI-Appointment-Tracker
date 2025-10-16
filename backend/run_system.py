@@ -15,14 +15,12 @@ if os.getcwd() != SCRIPT_DIR:
 if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
-
 def run_fastapi_server():
     """Run the FastAPI server."""
     print("🚀 Starting FastAPI Server...")
     from fastapi_server import app
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
-
 
 def run_livekit_listener():
     """Run the LiveKit RTC listener."""
@@ -33,7 +31,6 @@ def run_livekit_listener():
         _asyncio.run(run_rtc_listener())
     except Exception as e:
         print(f"❌ Error starting LiveKit listener: {e}")
-
 
 if __name__ == "__main__":
     print("🎯 Starting LiveKit Appointment Extraction System")
