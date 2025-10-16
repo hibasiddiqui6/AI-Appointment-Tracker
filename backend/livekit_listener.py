@@ -24,27 +24,43 @@ class CallListener:
         self.call_start_time = None
         self.appointment_data = AppointmentData()
         self.audio_buffer = []
+        # Reference to rtc.Room when running via run_rtc_listener
+        self.room = None
         
         # Speech detection parameters (tuned)
         self.silence_threshold = 3.0  # seconds of silence before processing
-        self.min_speech_duration = 1.0
-        self.last_audio_time = 0
         self.last_processed_time = 0
-        self.speech_detected = False
-        self.processing_timer = None
         self.processed_once = False  # avoid double-processing on disconnect
+        self.webhook_sent = False
+
         self.end_phrases = [
             "bye", "goodbye", "see you", "talk to you later", "thanks, bye",
             "have a nice day", "thank you bye", "that will be all"
         ]
+    
+    def reset_state(self):
+        """Reset listener state for a brand-new participant/call.
+        This avoids carrying transcript and timers between calls.
+        """
+        logger.info("Resetting call state for new participant")
+        self.transcript = ""
+        self.call_start_time = None
+        self.appointment_data = AppointmentData()
+        self.audio_buffer = []
+        self.last_processed_time = 0
+        self.processed_once = False
         
     async def on_participant_connected(self, participant: rtc.RemoteParticipant):
         """Called when a participant joins the room"""
         logger.info(f"Participant {participant.identity} connected")
+        # New participant implies a new call session; clear prior state
+        self.reset_state()
         
     async def on_participant_disconnected(self, participant: rtc.RemoteParticipant):
         """Called when a participant leaves the room"""
         logger.info(f"Participant {participant.identity} disconnected")
+        # Reset immediately so any reconnection starts clean
+        self.reset_state()
         
     async def on_track_subscribed(self, track: rtc.Track, publication: rtc.TrackPublication, participant: rtc.RemoteParticipant):
         """Called when a track is subscribed"""
@@ -115,6 +131,8 @@ class CallListener:
                         if self.call_start_time:
                             duration_seconds = now - self.call_start_time
                             self.appointment_data.call_duration = self.format_duration(duration_seconds)
+                        # Notify UI that call should end
+                        await self.notify_ui_call_finished()
                         self.processed_once = True
                         is_speaking = False
                         self.last_processed_time = now
@@ -165,39 +183,6 @@ class CallListener:
             hours = minutes // 60
             minutes = minutes % 60
             return f"{hours}:{minutes:02d}:{seconds:02d}"
-    
-    async def start_speech_detection(self):
-        """Start continuous speech detection monitoring"""
-        logger.info("Starting speech detection monitoring")
-        
-        # Allow some time to accumulate audio, then process if any
-        await asyncio.sleep(self.silence_threshold)
-        if self.speech_detected:
-            logger.info("Speech detected - processing audio buffer (initial)")
-            await self.process_audio_buffer()
-        else:
-            logger.warning("No speech detected within timeout; skipping transcription")
-    
-    async def schedule_processing(self):
-        """Schedule processing after silence period"""
-        try:
-            await asyncio.sleep(self.silence_threshold)
-            
-            # Check if we still have speech detected
-            logger.info(f"Silence check: idle={(time.time() - self.last_audio_time):.2f}s, processed_once={self.processed_once}")
-            if (
-                not self.processed_once and
-                self.speech_detected and 
-                len(self.audio_buffer) > 0 and 
-                (time.time() - self.last_audio_time) >= self.silence_threshold
-            ):
-                
-                logger.info("Silence detected - processing audio buffer (finalize segment)")
-                await self.process_audio_buffer()
-                self.processed_once = True
-                
-        except asyncio.CancelledError:
-            logger.debug("Processing timer cancelled - new audio detected")
         
     async def process_audio_buffer(self):
         """Process buffered audio data for transcription"""
@@ -288,16 +273,20 @@ class CallListener:
     async def send_to_webhook(self):
         """Send appointment data to n8n webhook"""
         try:
+            if self.webhook_sent:
+                return
             logger.info("Sending data to webhook...")
             # Ensure transcript and duration are up-to-date before sending
             if self.transcript:
                 self.appointment_data.transcript = self.transcript
-            if self.call_start_time:
+            # Do not overwrite duration if it was already finalized
+            if self.call_start_time and not self.appointment_data.call_duration:
                 duration_seconds = time.time() - self.call_start_time
                 self.appointment_data.call_duration = self.format_duration(duration_seconds)
             success = await self.webhook_sender.send_appointment_data(self.appointment_data)
             if success:
                 logger.info("✅ Data sent to webhook successfully")
+                self.webhook_sent = True
             else:
                 logger.error("❌ Failed to send data to webhook")
         except Exception as e:
@@ -321,6 +310,24 @@ class CallListener:
             
         # Send data to webhook
         await self.send_to_webhook()
+        
+        # Prepare for a new session if the room reconnects later
+        self.reset_state()
+
+    async def notify_ui_call_finished(self):
+        """Send a small data message so the UI auto-leaves."""
+        try:
+            if getattr(self, "room", None) and getattr(self.room, "local_participant", None):
+                message = b"END_CALL"
+                try:
+                    # default is reliable; no enum needed
+                    await self.room.local_participant.publish_data(message, topic="control")
+                except TypeError:
+                    # older SDKs without topic kwarg
+                    await self.room.local_participant.publish_data(message)
+                logger.info("Sent END_CALL signal to UI")
+        except Exception as e:
+            logger.warning(f"Failed to send END_CALL signal: {e}")
 
     
 
@@ -339,6 +346,7 @@ async def run_rtc_listener(room_name: str = "demo", identity: str = "listener-ag
     # Create room and listener instance
     room = rtc.Room()
     listener = CallListener()
+    listener.room = room
 
     # Set call start time at connection; will be overwritten on first speech
     listener.call_start_time = time.time()
